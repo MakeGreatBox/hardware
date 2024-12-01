@@ -9,58 +9,6 @@ import drivers
 import paho.mqtt.client as mqtt
 import random
 import time
-# Function to simulate the consumption of a servo motor
-def simulate_servo_motor_consumption():
-    # Assume idle consumption of 0.01A (10mA), and up to 0.5A (500mA) under load
-    idle_consumption = 0.01  # 10mA in Amps
-    max_consumption = 0.5    # 500mA in Amps
-    current_consumption = random.uniform(idle_consumption, max_consumption)
-    return current_consumption
-
-# Function to simulate the Raspberry Pi consumption
-def simulate_raspberry_pi_consumption():
-    # Raspberry Pi consumption range between 2W to 4W
-    min_power = 2.0  # 2W
-    max_power = 4.0  # 4W
-    current_power = random.uniform(min_power, max_power)
-    return current_power
-
-# Function to simulate LED consumption
-def simulate_led_consumption(led_count):
-    # Each LED consumes around 20mA
-    consumption_per_led = 0.02  # 20mA in Amps
-    total_consumption = led_count * consumption_per_led
-    return total_consumption
-
-
-# Function to simulate Buzzer consumption
-def simulate_buzzer_consumption():
-    # Buzzer typically uses about 50mA
-    buzzer_consumption = 0.05  # 50mA in Amps
-    return buzzer_consumption
-
-# Function to log and print the data
-def log_power_consumption():
-    # Simulate readings every 5 seconds
-    while True:
-        # Get the current timestamp
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # Get the consumption data
-        servo_consumption = simulate_servo_motor_consumption()
-        raspberry_consumption = simulate_raspberry_pi_consumption()
-        led_consumption = simulate_led_consumption(4)  # Assume 4 LEDs are on
-        buzzer_consumption = simulate_buzzer_consumption()
-
-        # Total consumption
-        total_consumption = servo_consumption + raspberry_consumption + led_consumption + buzzer_consumption
-
-        # Log the results
-        print(f"{timestamp} - Servo: {servo_consumption:.3f} A, Raspberry Pi: {raspberry_consumption:.3f} W, "
-              f"LEDs: {led_consumption:.3f} A, Buzzer: {buzzer_consumption:.3f} A, Total: {total_consumption:.3f} A")
-
-        # Wait for 5 seconds before logging the next data
-        time.sleep(5)
 
 # Define pins for devices
 motor = PWMOutputDevice(18)        # Motor PWM pin
@@ -72,15 +20,14 @@ buzzer = TonalBuzzer(23)
 safty_button = Button(22)
 start_button = Button(25)
 safty_detector = DigitalInputDevice(13)  
-
-# distance = DistanceSensor(echo=27, trigger=17)
 display = drivers.Lcd()
 processedBoxes = 0
+
 # MQTT Configuration
 mqtt_broker = "localhost"
 mqtt_port = 1883
 mqtt_topics = ["machine/start", "machine/stop", "machine/emergencyStop", "machine/machineConsume",
-               "machine/boxcount", "machine/settings", "machine/velocity", "machine/temperature"]
+               "machine/boxcount", "machine/settings", "machine/velocity"]
 
 # States
 warmingUp = False
@@ -112,10 +59,34 @@ reset_signal_received = False
 #         print("Distance is less than 10cm. Emergency stop.")
 #         return True
 
+# Consum dummy data generator
+# Function to simulate the consumption of a servo motor
+def simulate_servo_motor_consumption():
+    # Assume idle consumption of 0.01A (10mA), and up to 0.5A (500mA) under load
+    idle_consumption = 0.01  # 10mA in Amps
+    max_consumption = 0.5    # 500mA in Amps
+    current_consumption = random.uniform(idle_consumption, max_consumption)
+    return current_consumption
+# Function to simulate the Raspberry Pi consumption
+def simulate_raspberry_pi_consumption():
+    # Raspberry Pi consumption range between 2W to 4W
+    min_power = 2.0  # 2W
+    max_power = 4.0  # 4W
+    current_power = random.uniform(min_power, max_power)
+    return current_power
+# Function to simulate LED consumption
+def simulate_led_consumption(led_count):
+    # Each LED consumes around 20mA
+    consumption_per_led = 0.02  # 20mA in Amps
+    total_consumption = led_count * consumption_per_led
+    return total_consumption
+# Function to simulate Buzzer consumption
+def simulate_buzzer_consumption():
+    # Buzzer typically uses about 50mA
+    buzzer_consumption = 0.05  # 50mA in Amps
+    return buzzer_consumption
+# Function to process the velocity to the screen
 def procesVelocityToScrren():
-    ## 0.2 -> 1
-    ## 0.25 -> 2
-    ## 0.27 -> 3
     global lcdVelocity
     cases = {
         0.2: 1,
@@ -123,11 +94,13 @@ def procesVelocityToScrren():
         0.27: 3
     }
     lcdVelocity = cases.get(machineVelocity, 0)  # Default to 0 if no match found
+# Function to process the emergency stop
 def checkSaftySensor():
+    global machineStarted
     if safty_detector.value == 0:
+        motor.off()
         processEmergencyStop()
-
-
+# Buzzer Start Sequence
 def startBuzzer():
     
     buzzer.play(Tone("A4"))
@@ -145,9 +118,6 @@ def startBuzzer():
     buzzer.play(Tone("A4"))
     sleep(2)
     buzzer.stop()
-
-
-
 # MQTT message handler
 def on_message(client, userdata, message):
     global processedBoxes
@@ -174,12 +144,6 @@ def procesVelocity(value):
     global machineVelocity
     machineVelocity = value
                        # Clear the display of any data
-
-# def displayStats():
-#     display.lcd_clear()                                # Clear the display of any data
-#     display.lcd_display_string(f"Velocity: {machineVelocity:.2f}", 1)
-#     display.lcd_display_string(f"Processed Boxes: {processedBoxes}", 2)     
-#                       # Clear the display of any data
 
 def processStart():
     global machineStarted
@@ -283,7 +247,7 @@ def warmupMachine():
     global machineStarted
     if not machineStarted:
         display.lcd_clear()                                # Clear the display of any data
-        display.lcd_display_string("WARMING UP:", 1)
+        display.lcd_display_string("WARMING UP...", 1)
         print("Warming up the machine...")
         warmingUp = True
         led_thread = Thread(target=cyclingLedsWarmingLedWithBuzzer)
@@ -358,7 +322,7 @@ def main():
     yellow_led.off()
     display.lcd_clear()                                # Clear the display of any data
     display.lcd_display_string("Make Great Boxes", 1)   # Refresh the first line of display with a different message
-    display.lcd_display_string("Start the machine`", 2)   # Refresh the first line of display with a different message
+    display.lcd_display_string("Ready to start ", 2)   # Refresh the first line of display with a different message
 
     while True:
         global machineStarted
@@ -372,17 +336,15 @@ def main():
             print("Start button pressed.")
         if (machineStarted):
             sendData()
-            checkSaftySensor()
-            procesVelocityToScrren()
             motor.value = machineVelocity
+            procesVelocityToScrren()
             display.lcd_clear()                                # Clear the display of any data
             display.lcd_display_string(f"Boxes: {processedBoxes}", 1)
-            display.lcd_display_string(f"Velocity: {lcdVelocity:.2f}", 2)
-        # checkDistance()
-        # displayStats()
+            display.lcd_display_string(f"Velocity: {lcdVelocity}", 2)
+        checkSaftySensor()
+
         sleep(1)
 
-        # log_power_consumption()
 
 if __name__ == "__main__":
     main()
