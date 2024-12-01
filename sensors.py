@@ -210,7 +210,7 @@ def processEmergencyStop():
         red_led.off()
         yellow_led.off()
         display.lcd_clear()                                # Clear the display of any data
-        display.lcd_display_string("STOP OUT:", 1)
+        display.lcd_display_string("STOP OUT", 1)
         client.publish("machine/emergencyStop", False)
     else:
         display.lcd_clear()                                # Clear the display of any data
@@ -314,7 +314,6 @@ def sendData():
     # Send the data to the MQTT broker
     client.publish("machine/machineConsume", total_consumption)
 
-
 def main():
     yellow_led.on()
     # waitingForSignals()
@@ -337,12 +336,11 @@ def main():
         if (machineStarted):
             sendData()
             motor.value = machineVelocity
-            procesVelocityToScrren()
+            checkSaftySensor()
             display.lcd_clear()                                # Clear the display of any data
             display.lcd_display_string(f"Boxes: {processedBoxes}", 1)
             display.lcd_display_string(f"Velocity: {lcdVelocity}", 2)
-        checkSaftySensor()
-
+        procesVelocityToScrren()
         sleep(1)
 
 
